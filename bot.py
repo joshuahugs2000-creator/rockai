@@ -4,61 +4,72 @@ import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Configuration du logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Fonction pour répondre aux questions (version gratuite avec API simple)
 def ask_ai(question: str) -> str:
-    """Génère une réponse intelligente à la question"""
+    """Utilise l'API Hugging Face pour répondre intelligemment"""
     try:
-        # Ici on utilise une API gratuite - vous pourrez la changer plus tard
-        # Pour l'instant, réponse simple
-        return f"J'ai bien reçu votre question : '{question}'. Je suis un bot en développement et je peux répondre à vos questions !"
+        api_token = os.environ.get('HUGGINGFACE_TOKEN')
+        if not api_token:
+            return "❌ Token Hugging Face manquant."
+        
+        # API Hugging Face Inference (gratuite)
+        api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
+        headers = {"Authorization": f"Bearer {api_token}"}
+        
+        payload = {
+            "inputs": question,
+            "parameters": {
+                "max_length": 200,
+                "temperature": 0.7
+            }
+        }
+        
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', 'Désolé, je n\'ai pas pu générer une réponse.')
+            return "Je traite votre question..."
+        else:
+            logger.error(f"Erreur API: {response.status_code} - {response.text}")
+            return f"Votre question: {question}\n\nJe suis un bot intelligent propulsé par IA ! 🤖"
+            
     except Exception as e:
         logger.error(f"Erreur: {e}")
-        return "Désolé, une erreur s'est produite."
+        return "Une erreur s'est produite. Réessayez !"
 
-# Commande /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envoie un message de bienvenue"""
     await update.message.reply_text(
-        "👋 Bonjour ! Je suis un bot intelligent.\n\n"
-        "💬 Posez-moi n'importe quelle question !\n\n"
-        "📌 Commandes :\n"
-        "/start - Afficher ce message\n"
-        "/help - Obtenir de l'aide\n\n"
-        "Dans les groupes, mentionnez-moi ou répondez à mes messages."
+        "👋 Salut ! Je suis RockAI, votre assistant intelligent.\n\n"
+        "💬 Posez-moi vos questions, je réponds grâce à l'IA !\n\n"
+        "📌 Commandes : /start | /help"
     )
 
-# Commande /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envoie un message d'aide"""
     await update.message.reply_text(
         "🤖 Comment m'utiliser :\n\n"
-        "• En privé : envoyez votre question\n"
-        "• En groupe : mentionnez-moi (@votre_bot)\n\n"
-        "Je réponds à toutes vos questions !"
+        "• En privé : envoyez votre message directement\n"
+        "• En groupe : mentionnez-moi @votre_bot ou répondez à mes messages\n\n"
+        "Je suis propulsé par l'IA Hugging Face ! 🚀"
     )
 
-# Gestion des messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Traite les messages reçus"""
     message = update.message
     should_respond = False
     
-    # En conversation privée
     if message.chat.type == 'private':
         should_respond = True
     else:
-        # Dans les groupes
         bot_username = context.bot.username
         if message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
             should_respond = True
-        elif message.text and f"@{bot_username}" in message.text:
+        elif message.text and bot_username and f"@{bot_username}" in message.text:
             should_respond = True
     
     if should_respond:
@@ -70,28 +81,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = ask_ai(question)
         await message.reply_text(response)
 
-# Gestion des erreurs
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gère les erreurs"""
     logger.error(f"Erreur: {context.error}")
 
 def main():
-    """Démarre le bot"""
     TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
     
     if not TOKEN:
-        logger.error("❌ TELEGRAM_BOT_TOKEN non défini !")
+        logger.error("❌ TELEGRAM_BOT_TOKEN manquant !")
         return
     
-    application = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).build()
     
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_error_handler(error_handler)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_error_handler(error_handler)
     
-    logger.info("🚀 Bot démarré !")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("🚀 Bot RockAI démarré avec IA Hugging Face !")
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
