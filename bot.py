@@ -17,7 +17,6 @@ def ask_ai(question: str) -> str:
         if not api_token:
             return "❌ Token Hugging Face manquant."
         
-        # API Hugging Face Inference (gratuite)
         api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
         headers = {"Authorization": f"Bearer {api_token}"}
         
